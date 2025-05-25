@@ -305,18 +305,53 @@ class rangeselect(QMainWindow):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.backlabel = QLabel(self)
+        self.backlabel2 = QLabel(self)
         self.rectlabel = QLabel(self)
         self.backlabel.move(0, 0)
+        self.backlabel2.move(0, 0)
         # self.setWindowOpacity(0.5)
         self.setMouseTracking(True)
         self.setCursor(Qt.CursorShape.CrossCursor)
         self.reset()
 
     def reset(self):
-        if NativeUtils.IsMultiDifferentDPI():
-            NativeUtils.MaximumWindow(int(self.winId()))
-        else:
-            self.setGeometry(QRect(QPoint(0, 0), QApplication.screens()[0].size()))
+        # Not needed anymore
+        # if NativeUtils.IsMultiDifferentDPI():
+        #     NativeUtils.MaximumWindow(int(self.winId()))
+        # else:
+        #     self.setGeometry(QRect(QPoint(0, 0), QApplication.screens()[0].size()))
+
+        # Testing code - uncomment to see the output. This should be just the same as below
+        # print("-------------------------------")
+        # screens = QApplication.screens()
+        # for screen in screens:
+        #     print(screen.geometry(), screen.size(), screen.name(), screen.virtualGeometry(), screen.virtualSize())
+        # # Get virtual screen size
+        # min_x = min(screen.geometry().x() for screen in screens)
+        # min_y = min(screen.geometry().y() for screen in screens)
+        # max_x = max(screen.geometry().x() + screen.geometry().width() for screen in screens)
+        # max_y = max(screen.geometry().y() + screen.geometry().height() for screen in screens)
+        # print(min_x, min_y, max_x, max_y)
+        # rect = QRect(min_x, min_y, max_x - min_x, max_y - min_y)
+        # # self.setGeometry(rect)
+        # print(f"Virtual screen size: {rect}")
+        # print("Window size:", windows.GetWindowRect(int(self.winId())))
+
+        # This is the main logic working even for multiple monitors
+        screen = QApplication.primaryScreen()
+        print(f"Primary screen: {screen.virtualGeometry()}")
+        self.setGeometry(screen.virtualGeometry())
+        screenshot = screen.grabWindow(
+            0,
+            screen.virtualGeometry().x(),
+            screen.virtualGeometry().y(),
+            screen.virtualGeometry().width(),
+            screen.virtualGeometry().height(),
+        )
+        self.screenshot = screenshot
+        self.backlabel.setPixmap(screenshot)
+
+
         self.once = True
         self.is_drawing = False
         self.start_point = QPoint()
@@ -331,11 +366,16 @@ class rangeselect(QMainWindow):
         self.backlabel.setStyleSheet(
             "background-color: rgba(255,255,255, %s)" % globalconfig["ocrselectalpha"]
         )
+        self.backlabel2.setStyleSheet(
+            "background-color: rgba(255,255,255, %s)" % globalconfig["ocrselectalpha"]
+        )
 
     def resizeEvent(self, e: QResizeEvent):
-        if NativeUtils.IsMultiDifferentDPI():
-            NativeUtils.MaximumWindow(int(self.backlabel.winId()))
+        print(f"resizeEvent: {e.size()}")
+        # if NativeUtils.IsMultiDifferentDPI():
+        #     NativeUtils.MaximumWindow(int(self.backlabel.winId()))
         self.backlabel.resize(e.size())
+        self.backlabel2.resize(e.size())
 
     def paintEvent(self, _):
 
@@ -360,10 +400,7 @@ class rangeselect(QMainWindow):
             self.rectlabel.setGeometry(QRect(_sp, _ep))
 
     def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.MouseButton.RightButton:
-            self.once = False
-            self.close()
-        elif event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.end_point = self.start_point = event.pos()
             self.is_drawing = True
             self.__start = self.__end = windows.GetCursorPos()
@@ -409,6 +446,14 @@ class rangeselect(QMainWindow):
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             self.callbackfunction(event)
+        elif event.button() == Qt.MouseButton.RightButton:
+            self.once = False
+            self.close()
+        
+    def keyPressEvent(self, event): # Also cancle the selection with ESC
+        if event.key() == Qt.Key.Key_Escape:
+            self.once = False
+            self.close()
 
 
 class rangeselect_1(QMainWindow):
@@ -487,10 +532,7 @@ class rangeselect_1(QMainWindow):
             self.rectlabel.setGeometry(QRect(_sp, _ep))
 
     def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.MouseButton.RightButton:
-            self.once = False
-            self.close()
-        elif event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.end_point = self.start_point = event.pos()
             self.is_drawing = True
 
@@ -535,6 +577,16 @@ class rangeselect_1(QMainWindow):
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             self.callbackfunction(event)
+        # Make right click cancle be on "release" instead of "press"
+        # this will make sure no inputs leak into the main window
+        elif event.button() == Qt.MouseButton.RightButton:
+            self.once = False
+            self.close()
+
+    def keyPressEvent(self, event): # Also cancle the selection with ESC
+        if event.key() == Qt.Key.Key_Escape:
+            self.once = False
+            self.close()
 
     def closeEvent(self, a0):
         global screen_shot_ui
@@ -548,15 +600,17 @@ def rangeselct_function(callback, x=True):
     global screen_shot_ui
     if screen_shot_ui:
         screen_shot_ui.close()
-    if (not NativeUtils.IsMultiDifferentDPI()) or globalconfig[
-        "range_select_multi_dpi_capture_force"
-    ]:
-        screen_shot_ui = rangeselect_1(gobject.baseobject.translation_ui, x)
-    else:
-        screen_shot_ui = rangeselect(gobject.baseobject.translation_ui)
+    # if (not NativeUtils.IsMultiDifferentDPI()) or globalconfig[
+    #     "range_select_multi_dpi_capture_force"
+    # ]:
+    #     screen_shot_ui = rangeselect_1(gobject.baseobject.translation_ui, x)
+    # else:
+    #     screen_shot_ui = rangeselect(gobject.baseobject.translation_ui)
+    screen_shot_ui = rangeselect(gobject.baseobject.translation_ui)
     screen_shot_ui.originhwnd = windows.GetForegroundWindow()
     screen_shot_ui.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
     screen_shot_ui.show()
     screen_shot_ui.reset()
     screen_shot_ui.callback = callback
-    windows.SetFocus(int(screen_shot_ui.winId()))
+    # windows.SetFocus(int(screen_shot_ui.winId())) # Does not work
+    QTimer.singleShot(0, lambda: windows.SetForegroundWindow(int(screen_shot_ui.winId()))) # always seems to work work. Focus is important for key events
