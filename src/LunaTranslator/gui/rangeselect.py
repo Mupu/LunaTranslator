@@ -340,10 +340,10 @@ class rangeselect(QMainWindow):
 
         # This is the main logic working even for multiple monitors
         screen = QApplication.primaryScreen()
-        print(f"Primary screen: {screen.virtualGeometry()}")
+        # print(f"Primary screen: {screen.virtualGeometry()} {self.devicePixelRatioF()}")
         self.setGeometry(screen.virtualGeometry())
         if self.xx:
-            print(f"{screen.virtualGeometry().x()} {screen.virtualGeometry().y()} {screen.virtualGeometry().width()} {screen.virtualGeometry().height()}")
+            # print(f"{screen.virtualGeometry().x()} {screen.virtualGeometry().y()} {screen.virtualGeometry().width()} {screen.virtualGeometry().height()}")
             screenshot = screen.grabWindow(
                 0,
                 screen.virtualGeometry().x(),
@@ -353,7 +353,7 @@ class rangeselect(QMainWindow):
             )
             self.screenshot = screenshot
             self.backlabel.setPixmap(screenshot)
-            print(f"screenshot size: {self.screenshot.size()}")
+            # print(f"screenshot size: {self.screenshot.size()}")
 
         self.once = True
         self.is_drawing = False
@@ -442,8 +442,14 @@ class rangeselect(QMainWindow):
         self.close()
         try:
             # We need to use the window relative coordinates - NOT the screen coordinates (__start and __end)
-            x1, y1 = self.start_point.x(), self.start_point.y()
-            x2, y2 = self.end_point.x(), self.end_point.y()
+            # Scale by device pixel ratio when user set dpi scaling
+            x1 = int(self.start_point.x() * self.devicePixelRatioF())
+            y1 = int(self.start_point.y() * self.devicePixelRatioF())
+            x2 = int(self.end_point.x() * self.devicePixelRatioF())
+            y2 = int(self.end_point.y() * self.devicePixelRatioF())
+
+            print(f"window relative coordinates: {((x1, y1), (x2, y2))}")
+            print(f"window absolute coordinates: {((self.__start.x, self.__start.y), (self.__end.x, self.__end.y))}")
             img = None
             if self.xx and (x1 != x2 and y1 != y2):
                 img = self.screenshot.copy(
