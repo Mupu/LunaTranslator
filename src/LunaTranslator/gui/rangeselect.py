@@ -294,9 +294,10 @@ class rangeselect(QMainWindow):
         windows.SetForegroundWindow(self.originhwnd)
         return super().closeEvent(a0)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, xx=True):
 
         super(rangeselect, self).__init__(parent)
+        self.xx = xx
         self.is_drawing = False
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -341,16 +342,18 @@ class rangeselect(QMainWindow):
         screen = QApplication.primaryScreen()
         print(f"Primary screen: {screen.virtualGeometry()}")
         self.setGeometry(screen.virtualGeometry())
-        screenshot = screen.grabWindow(
-            0,
-            screen.virtualGeometry().x(),
-            screen.virtualGeometry().y(),
-            screen.virtualGeometry().width(),
-            screen.virtualGeometry().height(),
-        )
-        self.screenshot = screenshot
-        self.backlabel.setPixmap(screenshot)
-
+        if self.xx:
+            print(f"{screen.virtualGeometry().x()} {screen.virtualGeometry().y()} {screen.virtualGeometry().width()} {screen.virtualGeometry().height()}")
+            screenshot = screen.grabWindow(
+                0,
+                screen.virtualGeometry().x(),
+                screen.virtualGeometry().y(),
+                screen.virtualGeometry().width(),
+                screen.virtualGeometry().height(),
+            )
+            self.screenshot = screenshot
+            self.backlabel.setPixmap(screenshot)
+            print(f"screenshot size: {self.screenshot.size()}")
 
         self.once = True
         self.is_drawing = False
@@ -406,7 +409,6 @@ class rangeselect(QMainWindow):
             self.__start = self.__end = windows.GetCursorPos()
 
     def mouseMoveEvent(self, event: QMouseEvent):
-
         if not self.is_drawing:
             self.is_drawing = True
             self.end_point = self.start_point = event.pos()
@@ -439,9 +441,22 @@ class rangeselect(QMainWindow):
         self.__end = windows.GetCursorPos()
         self.close()
         try:
-            self.callback(self.getRange())
+            # We need to use the window relative coordinates - NOT the screen coordinates (__start and __end)
+            x1, y1 = self.start_point.x(), self.start_point.y()
+            x2, y2 = self.end_point.x(), self.end_point.y()
+            img = None
+            if self.xx and (x1 != x2 and y1 != y2):
+                img = self.screenshot.copy(
+                    QRect(QPoint(x1, y1), QPoint(x2, y2))
+                ).toImage()
+            self.callback(self.getRange(), img)
         except:
             print_exc()
+
+        # try:
+        #     self.callback(self.getRange())
+        # except:
+        #     print_exc()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -606,7 +621,7 @@ def rangeselct_function(callback, x=True):
     #     screen_shot_ui = rangeselect_1(gobject.baseobject.translation_ui, x)
     # else:
     #     screen_shot_ui = rangeselect(gobject.baseobject.translation_ui)
-    screen_shot_ui = rangeselect(gobject.baseobject.translation_ui)
+    screen_shot_ui = rangeselect(gobject.baseobject.translation_ui, x)
     screen_shot_ui.originhwnd = windows.GetForegroundWindow()
     screen_shot_ui.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
     screen_shot_ui.show()
